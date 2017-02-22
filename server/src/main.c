@@ -6,14 +6,9 @@ int main(){
 	p_custom_http chttp = chttp_init();
 	chttp_add(chttp, "Mode: Relay\r\n", 13);
 	chttp_add(chttp, "Target: abc\r\n", 14);
-	char *x = chttp_lookup(chttp, "Target: ");
+	chttp_finalise(chttp);
 
-	if( !x )
-		return 1;
-
-	getchar();
-	printf("%s\n", x);
-	free(x);
+	printf("%s\n", chttp->buffer);
 	chttp_destroy(chttp);
 	return 0;
 }
