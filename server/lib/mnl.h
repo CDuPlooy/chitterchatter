@@ -29,74 +29,51 @@ size_t _buffer_find(Buffer *buffer , char *ident ,size_t identLen, short *err);
 //This function is built with the idea of parsing C-Strings , or any other string for that matter, It can parse binary data though.
 
 #endif
-#ifndef CHTTP_HEADER_GUARD
-#define CHTTP_HEADER_GUARD
+#ifndef VVECTOR_H_GUARD
+#define VVECTOR_H_GUARD
 // Includes
 #include <stdlib.h>
-#include <math.h>
-#include <string.h>
-// #include <bsd/string.h>
-#include <stdio.h>
-// Defines
-#define CHTTPE_OK 0
-#define CHTTPE_GROW 1
-#define CHTTPE_LOOKUP 2
+
+// Constants
+#define VVECTOR_CHUNK_SIZE 250
+
+// Error Constants
+#define VVECTORE_OK 0
+#define VVECTORE_GROW 1
+
+
 // Structures
-typedef struct chttp{
-	char *buffer;
-	size_t size;
-	}custom_http, *p_custom_http;
+typedef struct vvector{
+	void **data;
+	size_t chunkSize; // Chunk size will be doubled every time it's reached.
+	size_t elements;
+	} *p_vvector , vvector;
+
 // Functions
-void *chttp_init();
-void chttp_destroy(p_custom_http chttp);
-const short chttp_add_header(p_custom_http chttp, const char *data, const size_t size);
-const short chttp_add(p_custom_http chttp, const char *data, const size_t size);
-const short chttp_grow(const p_custom_http chttp, const size_t size);
-char *chttp_lookup(const p_custom_http chttp, const char *key);
-const short chttp_finalise(const p_custom_http chttp , const char *data, const size_t size);
-char *chttp_getData(const p_custom_http chttp);
-const char *_chttp_find(const char *buffer, const size_t bufferSize, const char *find, const size_t findSize);
+p_vvector vvector_init();
+p_vvector vvector_init_adv(const size_t chunkSize);
+void vvector_free(p_vvector vector);
+
+short _vvector_grow(const p_vvector vector); // _because it's an internal function.
+short vvector_push(const p_vvector vector, const void *element);
+void *vvector_pop(const p_vvector vector);
+void *vvector_pop_bottom(const p_vvector vector);
+void *vvector_at(const p_vvector vector, const size_t i);
+
+
 #endif
-/*
-	Stores thread id's using vvectors.
-*/
-
-#ifndef CONTROLLER
-#define CONTROLLER
-#include <stdio.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include "../lib/vVector.h"
+#ifndef CIRCULAR_LIST_H
+#define CIRCULAR_LIST_H
+// INCLUDES
 // DEFINES
-#define THREAD_SIGNAL_READY 0
 
-// STRUCTURES
-typedef struct signalStruct{
-	unsigned short thread_signal;
-	unsigned short master_signal;
-	pthread_mutex_t *_mutex_thread_signal;
-	pthread_mutex_t *_mutex_master_signal;
-}signalStruct, *p_signalStruct;
+#define p_circularList p_vvector	// Circular lists are in essence just vvectors.
+#define circularList vvector		// TODO: This is temporary and should be fixed in before release 2.
+#define circularList_free vvector_free
+#define circularList_init vvector_init
 
-typedef struct threadController{
-	p_vvector threads;
-}threadController , *p_threadController;
-
-// FUNCTIONS (THREAD CONTROLLER)
-threadController *threadController_init();
-void threadController_destroy(threadController *tc);
-short threadController_pushback(const threadController *tc,const pthread_t id);
-void threadController_stopAll(const threadController *tc);
-
-// FUNCTIONS (SIGNALS)
-p_signalStruct signal_init();
-void signal_destroy(p_signalStruct signalStruct);
-void signal_set_thread(const p_signalStruct signalStruct,const unsigned short value);
-void signal_set_master(const p_signalStruct signalStruct,const unsigned short value);
-const unsigned short signal_get_thread(const p_signalStruct signalStruct);
-const unsigned short signal_get_master(const p_signalStruct signalStruct);
-
-
+short circularList_enqueue(p_circularList cl, const void *pnter);
+void *circularList_dequeue(p_circularList cl);
 #endif
 #ifndef C_DEBUG_H
 #define C_DEBUG_H
@@ -172,36 +149,83 @@ ssize_t recvAllFixed(int Socket , char *Buffer , const size_t Size , const int F
  */
 ssize_t sendAllFixed(int Socket , char *Buffer , const size_t Size , int Flags);
 #endif
-#ifndef VVECTOR_H_GUARD
-#define VVECTOR_H_GUARD
-// Includes
+/*
+	Stores thread id's using vvectors.
+*/
+
+#ifndef CONTROLLER
+#define CONTROLLER
+#include <stdio.h>
+#include <pthread.h>
 #include <stdlib.h>
 
-// Constants
-#define VVECTOR_CHUNK_SIZE 250
 
-// Error Constants
-#define VVECTORE_OK 0
-#define VVECTORE_GROW 1
+// DEFINES
+#define THREAD_SIGNAL_READY 0
+
+// STRUCTURES
+typedef struct threadQueue{
+	p_circularList queue;
+	pthread_mutex_t *mutex;
+}threadQueue, *p_threadQueue;
+
+typedef struct threadController{
+	p_vvector threads;
+	p_vvector threadQueues;
+}threadController , *p_threadController;
+
+typedef struct threadInfo{
+	p_threadQueue queue;
+	p_vvector reserved;
+}threadInfo, *p_threadInfo;
+
+// FUNCTIONS (THREAD CONTROLLER)
+threadController *threadController_init();
+void threadController_destroy(threadController *tc);
+short threadController_pushback(const threadController *tc,const pthread_t id);
+void threadController_stopAll(const threadController *tc);
+
+// FUNCTIONS (THREAD QUEUES)
+p_threadQueue threadQueue_init();
+void threadQueue_free(p_threadQueue tq);
+void threadQueue_enqueue(const p_threadQueue tq, const void *data);
+void *threadQueue_dequeue(const p_threadQueue tq);
+
+// FUNCTIONS (THREAD INFO)
+p_threadInfo threadInfo_init();
+void threadInfo_free(p_threadInfo ti);
+void threadInfo_enqueue(const p_threadInfo tq, const void *data);
+void *threadInfo_dequeue(const p_threadInfo tq);
 
 
+
+#endif
+#ifndef CHTTP_HEADER_GUARD
+#define CHTTP_HEADER_GUARD
+// Includes
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+// #include <bsd/string.h>
+#include <stdio.h>
+// Defines
+#define CHTTPE_OK 0
+#define CHTTPE_GROW 1
+#define CHTTPE_LOOKUP 2
 // Structures
-typedef struct vvector{
-	void **data;
-	size_t chunkSize; // Chunk size will be doubled every time it's reached.
-	size_t elements;
-	} *p_vvector , vvector;
-
+typedef struct chttp{
+	char *buffer;
+	size_t size;
+	}custom_http, *p_custom_http;
 // Functions
-p_vvector vvector_init();
-p_vvector vvector_init_adv(const size_t chunkSize);
-void vvector_free(p_vvector vector);
-
-short _vvector_grow(const p_vvector vector); // _because it's an internal function.
-short vvector_push(const p_vvector vector, const void *element);
-void *vvector_pop(const p_vvector vector);
-void *vvector_at(const p_vvector vector, const size_t i);
-
-
+void *chttp_init();
+void chttp_destroy(p_custom_http chttp);
+const short chttp_add_header(p_custom_http chttp, const char *data, const size_t size);
+const short chttp_add(p_custom_http chttp, const char *data, const size_t size);
+const short chttp_grow(const p_custom_http chttp, const size_t size);
+char *chttp_lookup(const p_custom_http chttp, const char *key);
+const short chttp_finalise(const p_custom_http chttp , const char *data, const size_t size);
+char *chttp_getData(const p_custom_http chttp);
+const char *_chttp_find(const char *buffer, const size_t bufferSize, const char *find, const size_t findSize);
 #endif
 #endif

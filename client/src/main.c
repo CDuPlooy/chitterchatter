@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "../lib/mnl.h"
 
-int main(int argc , char **argv){
-	
+int main(int argc, char **argv){
+
 	return 0;
 }
