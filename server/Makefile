@@ -6,4 +6,4 @@ LINK=-lpthread -lm
 CCA=$(CC) $(FLAGS) -std=$(STD) $(LINK)
 
 compile: src/main.c
-	$(CCA) build/mnl.a src/main.c -o build/server.out
+	$(CCA) src/main.c build/mnl.a -o build/server.out
