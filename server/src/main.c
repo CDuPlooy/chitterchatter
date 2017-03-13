@@ -6,19 +6,30 @@
 #define N_THREADS 25
 
 void *threadHandle(void *data){
-	p_logger log = data;
-	logIt(log, "Hello from thread!\n");
+	p_threadInfo ti = data;
+	printf("t:%p\n", (void *)ti->queue);
+	char a = getchar();
+	a='a';
+	void *data2 = NULL;
+	while(!data2){
+		
+		data2 = threadQueue_dequeue(ti->queue);
+	}
+
+	logIt(ti->reserved, data2);
 	return NULL;
 }
 
 int main(int argc , char **argv){
 	logger *log = logger_init("log.log");
+
 	logIt(log, "Application started\n");
 	p_threadController tc = threadController_init();
-	for(size_t i = 0 ; i < N_THREADS ; i++)
+	for(size_t i = 0 ; i < N_THREADS ; i++){
 		threadController_pushback(tc, threadHandle, log);
+	}
 
-	threadQueue_enqueue(vvector_at(tc->threadQueues, 0), "ok");
+	threadController_messsage(tc, 1, "Hello world");
 
 	char b = getchar();
 	b = 'a';
