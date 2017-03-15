@@ -172,10 +172,12 @@ typedef struct threadQueue{
 typedef struct threadController{
 	p_vvector threads;
 	p_vvector threadQueues;
+	p_threadQueue controllerQueue;
 }threadController , *p_threadController;
 
 typedef struct threadInfo{
 	p_threadQueue queue;
+	p_threadQueue controllerQueue;
 	void *(* routine)(void *);
 	void *reserved;
 }threadInfo, *p_threadInfo;
@@ -201,9 +203,7 @@ void threadInfo_free_no_queue(p_threadInfo ti);
 short threadInfo_enqueue(const p_threadInfo tq, const void *data);
 void *threadInfo_dequeue(const p_threadInfo tq);
 
-
-
-#endif
+#endif		//TODO: Implement an advanced pushback function to set the stack size.
 #ifndef CHTTP_HEADER_GUARD
 #define CHTTP_HEADER_GUARD
 // Includes
@@ -231,5 +231,29 @@ char *chttp_lookup(const p_custom_http chttp, const char *key);
 const short chttp_finalise(const p_custom_http chttp , const char *data, const size_t size);
 char *chttp_getData(const p_custom_http chttp);
 const char *_chttp_find(const char *buffer, const size_t bufferSize, const char *find, const size_t findSize);
+#endif
+#ifndef MAP_H
+#define MAP_H
+// Includes
+#include <stdlib.h>
+#include <stdio.h> // TODO: Remove
+#include <string.h>
+// Typedefs
+typedef struct map{
+	p_vvector key;
+	p_vvector value;
+	size_t size;
+}basic_map, *p_map;
+
+// Functions
+
+basic_map *mapCreate();
+basic_map *mapCreate_fromParams(const int argc ,const char **argv);
+void mapDestroy(basic_map *map);
+const short mapAdd(basic_map *map, const char *key, const char *value);
+const char *mapKeyLookup(const basic_map *map,const char *key);
+const char *mapValueLookup(const basic_map *map,const char *value);
+const short _mapKeyExist(const basic_map *map,const char *key);
+const short _mapValueExist(const basic_map *map,const char *value);
 #endif
 #endif
