@@ -148,6 +148,10 @@ ssize_t recvAllFixed(int Socket , char *Buffer , const size_t Size , const int F
  * @return        The amount of bytes returned / or -1 for an error
  */
 ssize_t sendAllFixed(int Socket , char *Buffer , const size_t Size , int Flags);
+
+// TODO: Check why inside a thread this function isn't setting the ip.
+char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen);
+char *getPeerAddr(const struct sockaddr *sa, socklen_t maxlen);
 #endif
 /*
 	Stores thread id's using vvectors.
