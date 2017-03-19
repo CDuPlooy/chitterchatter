@@ -220,6 +220,7 @@ void threadVector_free(p_threadVector tv);
 short threadVector_push(const p_threadVector tv, const void *data);
 void *threadVector_pop(const p_threadVector tv);
 void *threadVector_at(const p_threadVector tv, const size_t i);
+size_t threadVector_getSize(const p_threadVector tv);
 #endif		//TODO: Implement an advanced pushback function to set the stack size.
 #ifndef CHTTP_HEADER_GUARD
 #define CHTTP_HEADER_GUARD

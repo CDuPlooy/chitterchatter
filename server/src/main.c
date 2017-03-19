@@ -1,4 +1,5 @@
-#include <stdlib.h>
+
+	#include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -12,11 +13,8 @@
 #include "../lib/mnl.h"
 #include "../lib/server.h"
 
-#define N_THREADS 20
-struct userData{
-	p_threadVector vector;
-	int *sock;
-};
+#define N_THREADS 50
+
 
 void *func(void *data){
 	p_threadInfo ti = data;
@@ -72,13 +70,24 @@ void *func(void *data){
 			 	p_custom_http p = httpProcess(client);
 				if(p){
 					char *username = chttp_getData(p);
-					threadVector_push(u->vector, username);		//Omitted error checking here.
+					threadVector_push(u->usernames, username);		//Omitted error checking here.
+					threadVector_push(u->handles, &client);
 					chttp_destroy(p);
+					react(client, ti, "Notify-Client", username);
 
+					// Add a loop to parse the http while httpProcess is valid.
+					do{
+						p = httpProcess(client);
+						if(p){
+							char *action = chttp_lookup(p, "Server-Action: ");
+							react(client, ti, chttp_lookup(p, "Server-Action: "), chttp_getData(p));
 
-					p = httpProcess(client);
-					threadQueue_enqueue(ti->controllerQueue, chttp_lookup(p, "Server-Action: "));
-					chttp_destroy(p);
+							threadQueue_enqueue(ti->controllerQueue, action);
+							chttp_destroy(p);
+						}
+					}while(p != NULL);
+
+					close(client);
 				}
 				else{
 					threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Initial Handshake Failure!");
@@ -97,10 +106,12 @@ void *func(void *data){
 
 int main(int argc , char **argv){
 	p_threadController tc = threadController_init();
-	p_logger log = logger_init(NULL);
-	p_threadVector vector = threadVector_init();
+	p_threadVector usernames = threadVector_init();
+	p_threadVector socketHandles = threadVector_init();
 
 	assert(tc != NULL);
+	assert(usernames != NULL);
+	assert(socketHandles != NULL);
 
 
 	int Sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -115,7 +126,8 @@ int main(int argc , char **argv){
 	listen(Sock, 5);
 	struct userData u;
 	u.sock = &Sock;
-	u.vector = vector;
+	u.usernames = usernames;
+	u.handles = socketHandles;
 
 	for(size_t i = 0 ; i < N_THREADS ; i++)
 		threadController_pushback(tc, func, &u);
@@ -131,7 +143,9 @@ int main(int argc , char **argv){
 	}
 
 	threadController_destroy(tc);
-	logger_destroy(log);
-	threadVector_free(vector);
+
+	threadVector_free(usernames); // Add a loop to delete all usernames here.
+	threadVector_free(socketHandles);
+
 	return 0;
 }
