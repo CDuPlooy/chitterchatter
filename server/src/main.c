@@ -14,7 +14,7 @@
 
 #define N_THREADS 20
 struct userData{
-	p_logger log;
+	p_threadVector vector;
 	int *sock;
 };
 
@@ -37,6 +37,7 @@ void *func(void *data){
 
 	fd_set accept_set, read_set;
 	while(1){
+		sleep(1); // This sleep can be omitted if the server is under constant strain and can safely handle N_THREADS
 		FD_ZERO(&accept_set);
 		FD_SET(*((int *)u->sock),&accept_set);
 		int n = *((int *)u->sock) + 1;
@@ -54,20 +55,37 @@ void *func(void *data){
 
 			t.tv_sec = 4;
 			n = client + 1;
-			rv = select(n, &read_set, NULL, NULL, &t);
+			rv = select(n, &read_set, NULL, NULL, &t2);
 			if(rv == 0){ // Another timeout better check the thread queue
-				threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Read Timeout!");
-				close(client);
+
 			}else if(rv == -1){
-				threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Select error!");
+				threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Select Error!");
 				close(client);
 				continue;
 			}else if(rv != -1){
 				char *buffer = getPeerAddr((struct sockaddr *)&sa_in, sizeAddr);
+				char *msg = malloc(250);
+				snprintf(msg, 250, "Server-Notify: Connection from %s accepted!", buffer);
+				free(buffer);
+				buffer = msg;
 				threadQueue_enqueue(ti->controllerQueue, buffer);
 			 	p_custom_http p = httpProcess(client);
-				puts(chttp_getData(p));
-				chttp_destroy(p);
+				if(p){
+					char *username = chttp_getData(p);
+					threadVector_push(u->vector, username);		//Omitted error checking here.
+					chttp_destroy(p);
+
+
+					p = httpProcess(client);
+					threadQueue_enqueue(ti->controllerQueue, chttp_lookup(p, "Server-Action: "));
+					chttp_destroy(p);
+				}
+				else{
+					threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Initial Handshake Failure!");
+					close(client);
+					return NULL;
+				}
+
 				// At this point handle the data by calling recv and send on client
 				close(client);
 			}
@@ -80,6 +98,8 @@ void *func(void *data){
 int main(int argc , char **argv){
 	p_threadController tc = threadController_init();
 	p_logger log = logger_init(NULL);
+	p_threadVector vector = threadVector_init();
+
 	assert(tc != NULL);
 
 
@@ -93,13 +113,13 @@ int main(int argc , char **argv){
 	setsockopt(Sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
 	bind(Sock, (const struct sockaddr *)&sa, sizeof(sa));
 	listen(Sock, 5);
-	struct userData u[N_THREADS];
+	struct userData u;
+	u.sock = &Sock;
+	u.vector = vector;
 
-	for(size_t i = 0 ; i < N_THREADS ; i++){
-		u[i].log = log;
-		u[i].sock = &Sock;
-		threadController_pushback(tc, func, &u[i]);
-	}
+	for(size_t i = 0 ; i < N_THREADS ; i++)
+		threadController_pushback(tc, func, &u);
+
 
 	while(1){
 			char *data = threadQueue_dequeue(tc->controllerQueue);
@@ -112,5 +132,6 @@ int main(int argc , char **argv){
 
 	threadController_destroy(tc);
 	logger_destroy(log);
+	threadVector_free(vector);
 	return 0;
 }
