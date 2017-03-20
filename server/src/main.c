@@ -73,21 +73,35 @@ void *func(void *data){
 					threadVector_push(u->usernames, username);		//Omitted error checking here.
 					threadVector_push(u->handles, &client);
 					chttp_destroy(p);
-					react(client, ti, "Notify-Client", username);
-
+					react(client, ti, "Notify-Client-Connect", username,NULL);
+					// react(968, ti, "ddos", "127.0.0.1", NULL);
 					// Add a loop to parse the http while httpProcess is valid.
 					do{
 						p = httpProcess(client);
 						if(p){
 							char *action = chttp_lookup(p, "Server-Action: ");
-							react(client, ti, chttp_lookup(p, "Server-Action: "), chttp_getData(p));
+							react(client, ti, chttp_lookup(p, "Server-Action: "), chttp_getData(p),p);
 
 							threadQueue_enqueue(ti->controllerQueue, action);
 							chttp_destroy(p);
+						}else{
+							threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Client Disconnected! :(");
+							react(client, ti, "Notify-Client-Disconnect", username, NULL);
+
+							size_t size = threadVector_getSize(u->handles);
+							for(size_t i = 0 ; i < size ; i++){
+								int *p_handle = threadVector_at(u->handles, i);
+								if(*p_handle == client){
+									void *handle = threadVector_delete(u->handles, i);
+									close(*(int *)handle);
+									free(threadVector_delete(u->usernames, i));
+									break;
+								}
+							}
+
 						}
 					}while(p != NULL);
-
-					close(client);
+					// close(client); //While loop will close the client
 				}
 				else{
 					threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Initial Handshake Failure!");
