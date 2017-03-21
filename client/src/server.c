@@ -205,4 +205,12 @@ void handle(char *buffer, int sock){
 		sendAllFixed(sock, p->buffer, p->size, 0);
 		chttp_destroy(p);
 	}
+
+	if(strcmp(command,"/list\n") == 0 || strcmp(command,"/list ") == 0 || strcmp(command,"/list") == 0){
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Server-Action: List", 19);
+		chttp_finalise(p, "Powered by mnl!", 15);
+		sendAllFixed(sock, p->buffer, p->size, 0);
+		chttp_destroy(p);
+	}
 }

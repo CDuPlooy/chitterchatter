@@ -243,5 +243,46 @@ void react( int Socket, const p_threadInfo ti, char *action, char* data, const p
 
 		chttp_destroy(p);
 		return;
+	}else if(strcmp(action, "List") == 0){
+		// Notify
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Client-Action: Display", 22);
+
+		char *username = "Server-Bot-> ";
+		size_t namesSize = 0;
+		size_t arrList = threadVector_getSize(u->usernames);
+
+		for(size_t i = 0 ; i < arrList ; i++)
+			namesSize+=strlen(threadVector_at(u->usernames, i));
+
+		char *msg = malloc(strlen(username) + namesSize + arrList);
+		if(!msg){
+			chttp_destroy(p);
+			return;
+		}
+		strcat(msg, username);
+		for (size_t i = 0; i < arrList; i++) {
+			strcat(msg, threadVector_at(u->usernames, i));
+			strcat(msg, ",");
+		}
+
+		msg[strlen(username) + namesSize + arrList - 1] = '\n';
+		msg[strlen(username) + namesSize + arrList ] = 0;
+
+		chttp_finalise(p, msg, strlen(msg));
+
+
+
+		size_t size = threadVector_getSize(u->handles);
+		for(size_t i = 0 ; i < size ; i++){
+			int *sock = threadVector_at(u->handles, i);
+			if(!sock)
+				continue; // Ignore
+			else if (*sock == Socket){
+				sendAllFixed(*sock, p->buffer, p->size, 0);
+			}
+		}
+		chttp_destroy(p);
+		free(msg);
 	}
 }
