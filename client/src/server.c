@@ -177,6 +177,33 @@ void handle(char *buffer, int sock){
 		exit(1);
 	}
 
+	if(strcmp(command,"/nick") == 0){
+		char *find = strstr(buffer," ");
+		if(!find)
+			return;
+		find += 1;
+
+		char *findTwo = find + strlen(buffer);
+
+		char *username = malloc(findTwo - find);
+		memcpy(username, find, findTwo - find);
+		username[findTwo - find - 2] = 0; // Just to remove the trailing newline.
+
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Server-Action: Change-Nickname", 30);
+		char buff[250] = {0};
+			// snprintf(buff, 250, "Target-Nickname: %s", username);
+		strcpy(buff, "Target-Nickname: ");
+		strcat(buff, username);
+
+
+		chttp_add_header(p, buff, strlen(buff)-1);
+		chttp_finalise(p, "MNL", 3);
+		sendAllFixed(sock, p->buffer, p->size, 0);
+		chttp_destroy(p);
+		free(username);
+	}
+
 	if(strcmp(command,"/msg") == 0){
 		char *find = strstr(buffer," ");
 		if(!find)

@@ -284,5 +284,17 @@ void react( int Socket, const p_threadInfo ti, char *action, char* data, const p
 		}
 		chttp_destroy(p);
 		free(msg);
+	}else if(strcmp(action, "Change-Nickname") == 0){
+		char *nick = chttp_lookup(x, "Target-Nickname: ");
+
+		size_t at;
+		size_t size = threadVector_getSize(u->usernames);
+		for(size_t i = 0 ; i < size ; i++){
+			if(Socket == *(int *)threadVector_at(u->handles, i))
+				at = i;
+		}
+
+		void *t = threadVector_set(u->usernames, nick, at);
+		free(t);
 	}
 }
