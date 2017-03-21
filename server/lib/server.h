@@ -12,6 +12,7 @@ char *getUsername(int Sock, const p_threadVector handles,const p_threadVector us
 struct userData{
 	p_threadVector usernames;
 	p_threadVector handles;
+	p_threadQueue controllerQueue;
 	int *sock;
 };
 #endif

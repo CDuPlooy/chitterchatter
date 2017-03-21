@@ -1,5 +1,4 @@
-
-	#include <stdlib.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -13,9 +12,12 @@
 #include "../lib/mnl.h"
 #include "../lib/server.h"
 
-#define N_THREADS 50
+#define N_THREADS 20
 
-
+void help(){
+	puts("./server.out --port <port>");
+	puts("This is really the only configuration exposed for the server.");
+}
 void *func(void *data){
 	p_threadInfo ti = data;
 	struct userData *u = ti->reserved;
@@ -41,7 +43,12 @@ void *func(void *data){
 		int n = *((int *)u->sock) + 1;
 		int rv = select(n, &accept_set, NULL, NULL, &t);
 		if(rv == 0){ // If a timeout occurs on initial connect ; check if the main thread sent something.
-
+			void *data = threadQueue_dequeue(ti->queue);
+			if(data){
+				if(strcmp(data,"Please-Quit") == 0)
+				// puts("Quitting!");
+					return NULL;
+			}
 		}else if(rv == -1){ // Some sort of other error.
 			threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Connection Timeout!");
 			continue;
@@ -55,7 +62,13 @@ void *func(void *data){
 			n = client + 1;
 			rv = select(n, &read_set, NULL, NULL, &t2);
 			if(rv == 0){ // Another timeout better check the thread queue
-
+				void *data = threadQueue_dequeue(ti->queue);
+				if(data){
+					if(strcmp(data,"Please-Quit") == 0){
+						// puts("Quitting!");
+						return NULL;
+					}
+				}
 			}else if(rv == -1){
 				threadQueue_enqueue(ti->controllerQueue, "Client-Notify: Select Error!");
 				close(client);
@@ -74,7 +87,7 @@ void *func(void *data){
 					threadVector_push(u->handles, &client);
 					chttp_destroy(p);
 					react(client, ti, "Notify-Client-Connect", username,NULL);
-					// react(968, ti, "ddos", "127.0.0.1", NULL);
+
 					// Add a loop to parse the http while httpProcess is valid.
 					do{
 						p = httpProcess(client);
@@ -118,21 +131,31 @@ void *func(void *data){
 	return NULL;
 }
 
-int main(int argc , char **argv){
+int main(int argc , const char **argv){
+
+		for(size_t i = 0 ; i < argc ; i++){
+			if(strcmp("--help",argv[i]) == 0){
+				help();
+				exit(0);
+			}
+		}
+
+
+	basic_map *m = mapCreate_fromParams(argc, argv);
 	p_threadController tc = threadController_init();
 	p_threadVector usernames = threadVector_init();
 	p_threadVector socketHandles = threadVector_init();
-
+	assert(m != NULL);
 	assert(tc != NULL);
 	assert(usernames != NULL);
 	assert(socketHandles != NULL);
-
+	assert(mapKeyLookup(m, "--port") != NULL);
 
 	int Sock = socket(PF_INET, SOCK_STREAM, 0);
 
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
-	sa.sin_port = htons(8080);
+	sa.sin_port = htons(atoi(mapKeyLookup(m, "--port")));
 	sa.sin_addr.s_addr = 0;
 	int opt = 1;
 	setsockopt(Sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
@@ -142,6 +165,7 @@ int main(int argc , char **argv){
 	u.sock = &Sock;
 	u.usernames = usernames;
 	u.handles = socketHandles;
+	u.controllerQueue = tc->controllerQueue;
 
 	for(size_t i = 0 ; i < N_THREADS ; i++)
 		threadController_pushback(tc, func, &u);
@@ -153,11 +177,22 @@ int main(int argc , char **argv){
 				puts(data);
 				if(!strstr(data,"Client-Notify: "))
 					free(data);
+				if(strcmp(data, "Client-Notify: Please-Quit") == 0){
+					puts("Quit triggered!");
+					puts("Destroying threads. . .");
+					for (size_t i = 0; i < tc->threadQueues->elements; i++) {
+						p_threadQueue tq = vvector_at(tc->threadQueues, i);
+						threadQueue_enqueue(tq, "Please-Quit");
+					}
+					break;
+				}
 			}
 	}
-
+	sleep(1);
+	puts("\tThis may take some time!");
+	exit(0); // Hacky solution! Or problem creator maybe. Probably. Yeah no it's a problem.
 	threadController_destroy(tc);
-
+	mapDestroy(m);
 	threadVector_free(usernames); // Add a loop to delete all usernames here.
 	threadVector_free(socketHandles);
 
